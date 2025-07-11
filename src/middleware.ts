@@ -17,9 +17,10 @@ export const middleware = (request: NextRequest) => {
 
   // --- 1. Handle static chunk rewrites based on referer locale ---
   const isStaticChunk = originalPathname.startsWith("/_next/static/chunks/") && originalPathname.endsWith(".js");
+  console.log({isStaticChunk})
   if (isStaticChunk) {
     const referer = headers.get("referer");
-
+    console.log({referer})
     if (referer) {
       for (const locale of knownLocales) {
         if (referer.includes(`/${locale}`)) {
@@ -29,6 +30,7 @@ export const middleware = (request: NextRequest) => {
           }
           const redirected = request.nextUrl.clone();
           redirected.pathname = originalPathname.replace(/\.js$/, `.${locale}.js`);
+          console.log('redirecting to', redirected.pathname)
           return NextResponse.redirect(redirected, 307);
         }
       }
