@@ -1,4 +1,5 @@
 import fs from "fs";
+import path from "path";
 import { MessageFormatElement } from "react-intl";
 import { createIntl, type IntlShape } from "@formatjs/intl";
 import { defaultLocale, Locale } from "@/lib/locale";
@@ -14,7 +15,7 @@ export const getDictionary = (locale: Locale) => {
   if (dictionaryCache.has(locale)) {
     return dictionaryCache.get(locale)!;
   }
-  const filename = `./dictionaries/${locale}.json`;
+  const filename = path.resolve(process.cwd(), 'dictionaries', `${locale}.json`);
 
   try {
     const dictionary = JSON.parse(fs.readFileSync(filename, "utf8"));
