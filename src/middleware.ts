@@ -6,31 +6,57 @@ import {
 } from "@/lib/locale";
 import { NextResponse, type NextRequest } from "next/server";
 
+const knownLocales = [
+  "da-DK", "de-DE", "en-GB", "es-ES", "fr-FR",
+  "it-IT", "nl-NL", "pt-PT", "sv-SE"
+];
+
 export const middleware = (request: NextRequest) => {
   const { headers } = request;
-  let { pathname } = request.nextUrl;
+  const originalPathname = request.nextUrl.pathname;
 
+  // --- 1. Handle static chunk rewrites based on referer locale ---
+  const isStaticChunk = originalPathname.startsWith("/_next/static/chunks/") && originalPathname.endsWith(".js");
+  if (isStaticChunk) {
+    const referer = headers.get("referer");
+
+    if (referer) {
+      for (const locale of knownLocales) {
+        if (referer.includes(`/${locale}`)) {
+          if (originalPathname.endsWith(`.${locale}.js`)) {
+            // Already localized, no need to redirect
+            return;
+          }
+          const redirected = request.nextUrl.clone();
+          redirected.pathname = originalPathname.replace(/\.js$/, `.${locale}.js`);
+          return NextResponse.redirect(redirected, 307);
+        }
+      }
+    }
+    return; // Let unmatched chunk requests fall through
+  }
+
+  // --- 2. Locale extraction and header injection for other requests ---
   const isDev = process.env.NODE_ENV === "development";
+  let pathname = originalPathname;
+
   if (isDev) {
-    // We remove the locale from the pathname in development, to ensure it is always set to the default locale in the next step.
     pathname = removeLocaleFromPathname(pathname);
   }
 
-  const locale = getLocaleFromPathname(pathname);
-  // We set the value of locale to a header, so that we can access it in server components.
-  headers.set(localeHeader, locale ?? defaultLocale);
+  const locale = getLocaleFromPathname(pathname) ?? defaultLocale;
+  headers.set(localeHeader, locale);
 
-  if (!locale) {
-    // If there isn't an explicit locale in the URL, we rewrite to the default locale.
-    // Depending on your needs, you might want to change this to rewrite to the users' preferred locale, or do a redirect instead.
+  if (!getLocaleFromPathname(originalPathname)) {
+    // Add default locale to path if none is present
     const newUrl = request.nextUrl.clone();
     newUrl.pathname = `/${defaultLocale}${pathname}`;
     return NextResponse.rewrite(newUrl, { request: { headers } });
   }
+
   return NextResponse.next({ request: { headers } });
 };
 
-// Don't match static files, as they don't need to be rewritten with the locale attached.
 export const config = {
-  matcher: "/((?!_next/static|_next/image).*)",
+  matcher: ["/_next/static/chunks/:path*", "/((?!_next/static|_next/image).*)"],
 };
